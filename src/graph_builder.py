@@ -1,5 +1,6 @@
 from models.node import Node
 from models.way import Way
+from models.way_segment import WaySegment
 import osmium as osm
 import pandas as pd
 import tempfile
@@ -18,14 +19,18 @@ class OSMHandler(osm.SimpleHandler):
         self.nodes.update({n.positive_id(): Node(n.location, n.positive_id())})
 
     def way(self, w):
-        self.ways.append(Way(w.nodes))
+        is_oneway = 'yes' if w.tags.get('oneway') == 'yes' else 'no'
+        segments = []
         for idx in range(len(w.nodes)-1):
-            self.edges.add((self.nodes[w.nodes[idx].ref], self.nodes[w.nodes[idx + 1].ref] ))
+            segments.append(WaySegment(self.nodes[w.nodes[idx].ref], self.nodes[w.nodes[idx + 1].ref], is_oneway ))
+        way = Way(segments, is_oneway)
+        self.ways.append(way)
 
     def to_json_graph(self):
         result = {}
         result.update({'nodes' : [x[1].get_location_dict() for x in self.nodes.items()]})
-        result.update({'edges' : [{'start' : x[0].get_location_dict(), 'stop' : x[1].get_location_dict()} for x in self.edges]})
+        result.update({'edges' : [{'start' : segment.start.get_location_dict(), 'stop' :
+        segment.stop.get_location_dict(), 'is_oneway' : way.is_oneway} for way in self.ways for segment in way.segments]})
         return json.dumps(result)
 
 if __name__ == '__main__':
