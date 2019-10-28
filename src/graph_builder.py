@@ -26,16 +26,28 @@ class OSMHandler(osm.SimpleHandler):
         way = Way(segments, is_oneway)
         self.ways.append(way)
 
+    def find_and_set_intersections(self):
+        node_count = {x : 0 for x in self.nodes.keys()}
+        for way in self.ways:
+            for segment in way.segments:
+                node_count[segment.start.positive_id] += 1
+                node_count[segment.stop.positive_id] += 1
+        for positive_id, count in node_count.iteritems():
+            if count > 2:
+                self.nodes[positive_id].is_intersection = True
+
     def to_json_graph(self):
         result = {}
-        result.update({'nodes' : [x[1].get_location_dict() for x in self.nodes.items()]})
-        result.update({'edges' : [{'start' : segment.start.get_location_dict(), 'stop' :
-        segment.stop.get_location_dict(), 'is_oneway' : way.is_oneway} for way in self.ways for segment in way.segments]})
+        result.update({'nodes' : [x[1].serialize() for x in self.nodes.items()]})
+        result.update({'edges' : [{'start' : segment.start.serialize(), 'stop' :
+        segment.stop.serialize(), 'is_oneway' : way.is_oneway} for way in self.ways for segment in way.segments]})
         return json.dumps(result)
 
 if __name__ == '__main__':
     tmpfile = tempfile.NamedTemporaryFile()
     osmhandler = OSMHandler(tmpfile)
     osmhandler.apply_file(sys.argv[1])
-
+    
+    osmhandler.find_and_set_intersections()
+    
     print osmhandler.to_json_graph()
